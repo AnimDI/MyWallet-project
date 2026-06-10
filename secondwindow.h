@@ -25,6 +25,7 @@ private slots:
     void on_reload_clicked();
     void on_reload_2_clicked();
     void on_list_itemDoubleClicked(QListWidgetItem *item);
+    void on_search_cliked();
 
 private:
     int m_userId;
@@ -44,6 +45,8 @@ private:
     QLabel *status;
     redactor *editor;
     QSqlDatabase db;
+    QLineEdit *enterSearch;
+    QPushButton *searchButton;
 };
 
 #endif // SECONDWINDOW_H

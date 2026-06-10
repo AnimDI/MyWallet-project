@@ -99,12 +99,24 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     reload->setFixedSize(80, 80);
     reload->setStyleSheet("background-color: #2e7d5e; color: white; font-size: 14px; font-weight: bold; border-radius: 40px; text-align: center;");
 
+    searchButton = new QPushButton("Поиск");
+    searchButton->setFixedSize(80, 80);
+    searchButton->setStyleSheet("background-color: #2e7d5e; color: white; font-size: 14px; font-weight: bold; border-radius: 40px; text-align: center;");
+
     bottomLayout->addWidget(reload_2);
     bottomLayout->addWidget(list);
     bottomLayout->addWidget(reload);
 
     mainLayout->addLayout(bottomLayout, 1, 0);
+    QHBoxLayout *searchLayout = new QHBoxLayout();
 
+    enterSearch=new QLineEdit();
+    enterSearch->setStyleSheet("QLineEdit { background-color: white; border: 1px solid #2e7d5e; border-radius: 18px; padding: 8px 15px; min-width: 200px; }");
+
+    searchLayout->addWidget(enterSearch);
+    searchLayout->addWidget(searchButton);
+
+    mainLayout->addLayout(searchLayout,2,0,Qt::AlignCenter);
     // statusbar = new QStatusBar(this);
     // setStatusBar(statusbar);
     status = new QLabel(this);
@@ -112,14 +124,14 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     status->setAlignment(Qt::AlignCenter);
     status->setStyleSheet("color: #d14545; font-size: 14px; font-weight: 500; margin-top: 15px;");
 
-    mainLayout->addWidget(status, 2, 0, Qt::AlignCenter);
+    mainLayout->addWidget(status, 3, 0, Qt::AlignCenter);
 
 
     connect(pushButton, &QPushButton::clicked, this, &secondwindow::on_pushButton_clicked);
     connect(reload, &QPushButton::clicked, this, &secondwindow::on_reload_clicked);
     connect(reload_2, &QPushButton::clicked, this, &secondwindow::on_reload_2_clicked);
     connect(list, &QListWidget::itemDoubleClicked, this, &secondwindow::on_list_itemDoubleClicked);
-
+    connect(searchButton,&QPushButton::clicked,this, &secondwindow::on_search_cliked);
 
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName("./MyWalletDB.db");
@@ -217,12 +229,56 @@ void secondwindow::on_reload_clicked()
     doxod->setText(QString::number(doxodSum));
 
 }
+void secondwindow::on_search_cliked(){
+    QString comment= enterSearch->text();
+    if(comment.isEmpty()){
+        status->setText("Введите данные для поиска");
+        status->setVisible(true);
+        return;
+    }
+    list->clear();
+    QSqlQuery query;
+    query.prepare("SELECT id, date, summ, comment, type FROM spending WHERE user_id = ? AND comment=? ORDER BY date DESC");
+    query.addBindValue(m_userId);
+    query.addBindValue(comment);
+    query.exec();
+    double endSumm = 0, doxodSum = 0, rasxodSum = 0;
 
+    while (query.next()) {
+        int id = query.value(0).toInt();
+        QString date = query.value(1).toString();
+        double summ = query.value(2).toDouble();
+        QString comment = query.value(3).toString();
+        int type = query.value(4).toInt();
+
+        endSumm += summ;
+
+        QListWidgetItem *item = new QListWidgetItem();
+        item->setData(Qt::UserRole, id);
+        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment);
+
+        if (type == 1) {
+            item->setForeground(QColor(46, 125, 94));
+            doxodSum += summ;
+        } else {
+            item->setForeground(QColor(209, 69, 69));
+            rasxodSum += summ;
+        }
+
+        list->addItem(item);
+    }
+
+    balance->setText(QString::number(endSumm));
+    rasxod->setText(QString::number(rasxodSum));
+    doxod->setText(QString::number(doxodSum));
+
+
+}
 void secondwindow::on_reload_2_clicked()
 {
     QListWidgetItem *currentItem = list->currentItem();
     if (!currentItem) {
-        statusbar->showMessage("Не выбран элемент", 3000);
+
         status->setText("не выбран элемент");
         status->setVisible(true);
         return;
@@ -235,7 +291,8 @@ void secondwindow::on_reload_2_clicked()
     query.addBindValue(m_userId);
 
     if (query.exec()) {
-        statusbar->showMessage("Удалено", 3000);
+        status->setText("Удалено");
+        status->setVisible(true);
         on_reload_clicked();
     } else {
 

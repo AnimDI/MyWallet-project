@@ -11,6 +11,7 @@
 #include <QSqlQuery>
 #include <QSqlDatabase>
 #include <QIntValidator>
+#include <QComboBox>
 #include <redactor.h>
 class secondwindow : public QMainWindow
 {
@@ -26,6 +27,7 @@ private slots:
     void on_reload_2_clicked();
     void on_list_itemDoubleClicked(QListWidgetItem *item);
     void on_search_cliked();
+    QString returnCategory(QString category);
 
 private:
     int m_userId;
@@ -47,6 +49,7 @@ private:
     QSqlDatabase db;
     QLineEdit *enterSearch;
     QPushButton *searchButton;
+    QComboBox *categoryBox;
 };
 
 #endif // SECONDWINDOW_H

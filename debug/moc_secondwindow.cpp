@@ -47,7 +47,9 @@ template <> constexpr inline auto secondwindow::qt_create_metaobjectdata<qt_meta
         "on_list_itemDoubleClicked",
         "QListWidgetItem*",
         "item",
-        "on_search_cliked"
+        "on_search_cliked",
+        "returnCategory",
+        "category"
     };
 
     QtMocHelpers::UintData qt_methods {
@@ -63,6 +65,10 @@ template <> constexpr inline auto secondwindow::qt_create_metaobjectdata<qt_meta
         }}),
         // Slot 'on_search_cliked'
         QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'returnCategory'
+        QtMocHelpers::SlotData<QString(QString)>(9, 2, QMC::AccessPrivate, QMetaType::QString, {{
+            { QMetaType::QString, 10 },
+        }}),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -91,6 +97,8 @@ void secondwindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         case 2: _t->on_reload_2_clicked(); break;
         case 3: _t->on_list_itemDoubleClicked((*reinterpret_cast<std::add_pointer_t<QListWidgetItem*>>(_a[1]))); break;
         case 4: _t->on_search_cliked(); break;
+        case 5: { QString _r = _t->returnCategory((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1])));
+            if (_a[0]) *reinterpret_cast<QString*>(_a[0]) = std::move(_r); }  break;
         default: ;
         }
     }
@@ -115,14 +123,14 @@ int secondwindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 5)
+        if (_id < 6)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 5;
+        _id -= 6;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 5)
+        if (_id < 6)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 5;
+        _id -= 6;
     }
     return _id;
 }

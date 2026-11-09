@@ -8,6 +8,7 @@
 #include <QPushButton>
 #include <QSqlQuery>
 #include <QSqlDatabase>
+#include <QComboBox>
 
 class redactor : public QDialog
 {
@@ -28,6 +29,7 @@ private:
     QLineEdit *enterSumm;
     QLineEdit *etnerText;
     QPushButton *saveButton;
+    QComboBox *categoryBox;
 };
 
 #endif // REDACTOR_H

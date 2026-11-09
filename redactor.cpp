@@ -22,6 +22,9 @@ redactor::redactor(int userId, int recordId, QWidget *parent)
     summLabel->setAlignment(Qt::AlignCenter);
     QLabel *commentLabel = new QLabel("Комментарий");
     commentLabel->setAlignment(Qt::AlignCenter);
+    QLabel *categoryLabel = new QLabel("Категория");
+    categoryLabel->setAlignment(Qt::AlignCenter);
+
 
     enterDate = new QLineEdit();
     enterDate->setStyleSheet("QLineEdit { background-color: white; color: #1a3b2e; font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 13px; font-weight: 500; border: 1.5px solid #2e7d5e; border-radius: 18px; padding: 4px 10px; min-width: 140px; min-height: 8px; max-height: 24px; }");
@@ -35,16 +38,27 @@ redactor::redactor(int userId, int recordId, QWidget *parent)
     saveButton = new QPushButton("Сохранить");
     saveButton->setStyleSheet("QPushButton { background-color: transparent; color: #2e7d5e; font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 16px; font-weight: 700; border: 2px solid #2e7d5e; border-radius: 10px; padding: 10px 22px; min-width: 100px; } QPushButton:hover { background-color: #2e7d5e; color: white; } QPushButton:pressed { background-color: #1a5b42; border-color: #1a5b42; }");
 
+    categoryBox = new QComboBox(this);
+    categoryBox->addItem("Еда","food");
+    categoryBox->addItem("Переводы","translation");
+    categoryBox->addItem("Супермаркеты","shops");
+    categoryBox->addItem("Цифровые товары","digital_goods");
+    categoryBox->addItem("Красота","beauty");
+    categoryBox->addItem("Транспорт","transport");
+    categoryBox->addItem("Остальное","rest");
+
+
     mainLayout->addWidget(dateLabel, 0, 0);
     mainLayout->addWidget(summLabel, 1, 0);
     mainLayout->addWidget(commentLabel, 2, 0);
     mainLayout->addWidget(enterDate, 0, 2);
     mainLayout->addWidget(enterSumm, 1, 2);
     mainLayout->addWidget(etnerText, 2, 2);
-    mainLayout->addWidget(saveButton, 3, 0, 1, 3);
-
+    mainLayout->addWidget(saveButton, 4, 0, 1, 3);
+    mainLayout->addWidget(categoryLabel,3,0);
+     mainLayout->addWidget(categoryBox,3,1);
     QSqlQuery query;
-    query.prepare("SELECT date, summ, comment, type FROM spending WHERE id = ? AND user_id = ?");
+    query.prepare("SELECT date, summ, comment, type, category FROM spending WHERE id = ? AND user_id = ?");
     query.addBindValue(m_recordId);
     query.addBindValue(m_userId);
 
@@ -52,6 +66,11 @@ redactor::redactor(int userId, int recordId, QWidget *parent)
         enterDate->setText(query.value(0).toString());
         enterSumm->setText(QString::number(query.value(1).toDouble()));
         etnerText->setText(query.value(2).toString());
+        QString catCode = query.value(4).toString();
+        int index = categoryBox->findData(catCode);
+        if (index != -1) {
+            categoryBox->setCurrentIndex(index);
+        }
     }
 
     connect(saveButton, &QPushButton::clicked, this, &redactor::on_saveButton_clicked);
@@ -64,18 +83,19 @@ void redactor::on_saveButton_clicked()
     QString date = enterDate->text();
     int summ = enterSumm->text().toInt();
     QString comment = etnerText->text();
-
+    QString category= categoryBox->currentData().toString();
     QSqlQuery query;
 
     if (summ > 0) {
-        query.prepare("UPDATE spending SET summ = ?, type = 1, date = ?, comment = ? WHERE id = ? AND user_id = ?");
+        query.prepare("UPDATE spending SET summ = ?, type = 1, date = ?, comment = ?, category = ? WHERE id = ? AND user_id = ?");
     } else {
-        query.prepare("UPDATE spending SET summ = ?, type = 0, date = ?, comment = ? WHERE id = ? AND user_id = ?");
+        query.prepare("UPDATE spending SET summ = ?, type = 0, date = ?, comment = ?, category = ? WHERE id = ? AND user_id = ?");
     }
 
     query.addBindValue(summ);
     query.addBindValue(date);
     query.addBindValue(comment);
+    query.addBindValue(category);
     query.addBindValue(m_recordId);
     query.addBindValue(m_userId);
 

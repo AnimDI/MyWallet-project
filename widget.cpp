@@ -177,7 +177,7 @@ Widget::Widget(QWidget *parent)
 
     query = new QSqlQuery(db);
     query->exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT, password TEXT);");
-    query->exec("CREATE TABLE IF NOT EXISTS spending(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, summ DOUBLE, type BOOLEAN, date TEXT, comment TEXT, FOREIGN KEY(user_id) REFERENCES users(id));");
+    query->exec("CREATE TABLE IF NOT EXISTS spending(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, summ DOUBLE, type BOOLEAN, date TEXT, comment TEXT,category TEXT FOREIGN KEY(user_id) REFERENCES users(id));");
 
     userId = -1;
     userLogin = "";

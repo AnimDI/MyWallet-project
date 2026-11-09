@@ -58,18 +58,33 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     summLabel->setAlignment(Qt::AlignCenter);
     QLabel *commentLabel = new QLabel("Комментарий");
     commentLabel->setAlignment(Qt::AlignCenter);
-
+    QLabel *categoryLabel = new QLabel("Категория");
+    categoryLabel->setAlignment(Qt::AlignCenter);
     enterDate = new QLineEdit();
     enterSumm = new QLineEdit();
     enterSumm->setValidator(new QIntValidator(-999999999, 999999999, this));
     etnerText = new QLineEdit();
 
+
+    categoryBox = new QComboBox(this);
+    categoryBox->addItem("Еда","food");
+    categoryBox->addItem("Переводы","translation");
+    categoryBox->addItem("Супермаркеты","shops");
+    categoryBox->addItem("Цифровые товары","digital_goods");
+    categoryBox->addItem("Красота","beauty");
+    categoryBox->addItem("Транспорт","transport");
+    categoryBox->addItem("Остальное","rest");
+
+
+
     formLayout->addWidget(dateLabel, 0, 0);
     formLayout->addWidget(summLabel, 1, 0);
     formLayout->addWidget(commentLabel, 2, 0);
+    formLayout->addWidget(categoryLabel,3,0);
     formLayout->addWidget(enterDate, 0, 2);
     formLayout->addWidget(enterSumm, 1, 2);
     formLayout->addWidget(etnerText, 2, 2);
+    formLayout->addWidget(categoryBox,3,2);
 
     topLayout->addLayout(formLayout);
 
@@ -141,9 +156,18 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
 
     QSqlQuery query;
     query.exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT, password TEXT);");
-    query.exec("CREATE TABLE IF NOT EXISTS spending(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, summ DOUBLE, type BOOLEAN, date TEXT, comment TEXT);");
+    query.exec("CREATE TABLE IF NOT EXISTS spending(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, summ DOUBLE, type BOOLEAN, date TEXT, comment TEXT, category TEXT);");
 
     on_reload_clicked();
+}
+QString secondwindow::returnCategory(QString category){
+    for(int i=0;i<categoryBox->count();i++){
+        if(category== categoryBox->itemData(i).toString()){
+            return categoryBox->itemText(i);
+        }
+    }
+    return category;
+
 }
 
 secondwindow::~secondwindow()
@@ -156,7 +180,7 @@ void secondwindow::on_pushButton_clicked()
     int summ = enterSumm->text().toInt();
     QString coment = etnerText->text();
     QString date = enterDate->text();
-
+    QString category= categoryBox->currentData().toString();
     if (summ == 0 || coment.isEmpty() || date.isEmpty()) {
         status->setText("Заполните все поля");
         status->setVisible(true);
@@ -164,16 +188,16 @@ void secondwindow::on_pushButton_clicked()
     }
 
     if (summ > 0) {
-        query.prepare("INSERT INTO spending (user_id, summ, type, date, comment) VALUES (?, ?, 1, ?, ?)");
+        query.prepare("INSERT INTO spending (user_id, summ, type, date, comment, category) VALUES (?, ?, 1, ?, ?, ?)");
     } else {
-        query.prepare("INSERT INTO spending (user_id, summ, type, date, comment) VALUES (?, ?, 0, ?, ?)");
+        query.prepare("INSERT INTO spending (user_id, summ, type, date, comment, category) VALUES (?, ?, 0, ?, ?, ?)");
     }
 
     query.addBindValue(m_userId);
     query.addBindValue(summ);
     query.addBindValue(date);
     query.addBindValue(coment);
-
+    query.addBindValue(category);
     if (query.exec()) {
 
         status->setText("Операция добавлена");
@@ -194,7 +218,7 @@ void secondwindow::on_reload_clicked()
 {
     list->clear();
     QSqlQuery query;
-    query.prepare("SELECT id, date, summ, comment, type FROM spending WHERE user_id = ? ORDER BY date DESC");
+    query.prepare("SELECT id, date, summ, comment, type, category FROM spending WHERE user_id = ? ORDER BY date DESC");
     query.addBindValue(m_userId);
     query.exec();
 
@@ -206,12 +230,12 @@ void secondwindow::on_reload_clicked()
         double summ = query.value(2).toDouble();
         QString comment = query.value(3).toString();
         int type = query.value(4).toInt();
-
+        QString category= returnCategory(query.value(5).toString());
         endSumm += summ;
 
         QListWidgetItem *item = new QListWidgetItem();
         item->setData(Qt::UserRole, id);
-        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment);
+        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
 
         if (type == 1) {
             item->setForeground(QColor(46, 125, 94));
@@ -238,7 +262,7 @@ void secondwindow::on_search_cliked(){
     }
     list->clear();
     QSqlQuery query;
-    query.prepare("SELECT id, date, summ, comment, type FROM spending WHERE user_id = ? AND comment=? ORDER BY date DESC");
+    query.prepare("SELECT id, date, summ, comment, type, category FROM spending WHERE user_id = ? AND comment=? ORDER BY date DESC");
     query.addBindValue(m_userId);
     query.addBindValue(comment);
     query.exec();
@@ -251,11 +275,13 @@ void secondwindow::on_search_cliked(){
         QString comment = query.value(3).toString();
         int type = query.value(4).toInt();
 
+        QString category= returnCategory(query.value(5).toString());
+
         endSumm += summ;
 
         QListWidgetItem *item = new QListWidgetItem();
         item->setData(Qt::UserRole, id);
-        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment);
+        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
 
         if (type == 1) {
             item->setForeground(QColor(46, 125, 94));

@@ -12,7 +12,10 @@
 #include <QSqlDatabase>
 #include <QIntValidator>
 #include <QComboBox>
+#include <QMessageBox>
 #include <redactor.h>
+#include <QStackedWidget>
+#include <QDateEdit>
 class secondwindow : public QMainWindow
 {
     Q_OBJECT
@@ -27,6 +30,8 @@ private slots:
     void on_reload_2_clicked();
     void on_list_itemDoubleClicked(QListWidgetItem *item);
     void on_search_cliked();
+    void on_save_limit_clicked();
+    void on_reload_limits_clicked();
     QString returnCategory(QString category);
 
 private:
@@ -36,10 +41,13 @@ private:
     QListWidget *list;
     QLineEdit *enterSumm;
     QLineEdit *etnerText;
-    QLineEdit *enterDate;
+    //QLineEdit *enterDate;
+    QDateEdit *enterDate;
+
     QPushButton *pushButton;
     QPushButton *reload;
     QPushButton *reload_2;
+
     QLabel *balance;
     QLabel *rasxod;
     QLabel *doxod;
@@ -50,6 +58,21 @@ private:
     QLineEdit *enterSearch;
     QPushButton *searchButton;
     QComboBox *categoryBox;
+    QMessageBox *messageBox;
+    QStackedWidget *stackedWidget;
+    QWidget *sidebar;
+
+    QLineEdit *enterSummLimit;
+    QComboBox *categoryBoxLimit;
+    QListWidget *limitsList;
+    QLabel *limitsStatus;
+    QPushButton *saveLimitBtn;
+    QPushButton *reloadLimitBtn;
+    QWidget *mainPage;
+    QWidget *limitPage;
+
+    QPushButton *mainPage_button;
+    QPushButton *limitPage_button;
 };
 
 #endif // SECONDWINDOW_H

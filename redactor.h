@@ -9,7 +9,7 @@
 #include <QSqlQuery>
 #include <QSqlDatabase>
 #include <QComboBox>
-
+#include <QDateEdit>
 class redactor : public QDialog
 {
     Q_OBJECT
@@ -25,7 +25,8 @@ private:
     int m_userId;
     int m_recordId;
 
-    QLineEdit *enterDate;
+    //QLineEdit *enterDate;
+    QDateEdit *enterDate;
     QLineEdit *enterSumm;
     QLineEdit *etnerText;
     QPushButton *saveButton;

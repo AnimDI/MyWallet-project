@@ -12,20 +12,56 @@
 #include <QColor>
 #include <QDate>
 #include <QDebug>
-
+//#include <QStackedWidget>
 secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     : QMainWindow(parent), m_userId(userId), m_userLogin(userLogin)
 {
     setWindowTitle("Мой кошелёк");
     resize(1010, 691);
 
+
+
     QWidget *central = new QWidget(this);
     setCentralWidget(central);
 
-    QGridLayout *mainLayout = new QGridLayout(central);
+    QHBoxLayout *rootLayout = new QHBoxLayout(central);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+
+    QWidget *sidebar = new QWidget;
+    sidebar->setFixedWidth(80);
+    sidebar->setStyleSheet("background-color: #2e7d5e;");
+    QVBoxLayout *sideLayout = new QVBoxLayout(sidebar);
+
+    mainPage_button= new QPushButton("Траты");
+    limitPage_button= new QPushButton("Лимиты");
+    mainPage_button->setFixedHeight(50);
+    limitPage_button->setFixedHeight(50);
+    mainPage_button->setStyleSheet("color: white; background: transparent; border: none; font-weight: bold;");
+    limitPage_button->setStyleSheet("color: white; background: transparent; border: none; font-weight: bold;");
+
+    sideLayout->addWidget(mainPage_button);
+    sideLayout->addWidget(limitPage_button);
+    sideLayout->addStretch();
+
+
+    stackedWidget = new QStackedWidget(this);
+    mainPage = new QWidget(this);
+    QGridLayout *mainLayout = new QGridLayout(mainPage);
+
+
+
+
+    //rootLayout->addWidget(pageWallet,1);
+
+
 
     QHBoxLayout *topLayout = new QHBoxLayout();
 
+
+
+
+    //основное
 
     QGridLayout *balanceLayout = new QGridLayout();
     balance = new QLabel("0");
@@ -60,20 +96,26 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     commentLabel->setAlignment(Qt::AlignCenter);
     QLabel *categoryLabel = new QLabel("Категория");
     categoryLabel->setAlignment(Qt::AlignCenter);
-    enterDate = new QLineEdit();
+    enterDate = new QDateEdit();
+    enterDate->setDate(QDate::currentDate());
     enterSumm = new QLineEdit();
-    enterSumm->setValidator(new QIntValidator(-999999999, 999999999, this));
+    QDoubleValidator *summValidator =new QDoubleValidator(-999999999, 999999999,2, this);
+
+    summValidator->setNotation(QDoubleValidator::StandardNotation);
+    summValidator->setLocale(QLocale::c());
+    enterSumm->setValidator(summValidator);
     etnerText = new QLineEdit();
 
 
-    categoryBox = new QComboBox(this);
-    categoryBox->addItem("Еда","food");
-    categoryBox->addItem("Переводы","translation");
-    categoryBox->addItem("Супермаркеты","shops");
-    categoryBox->addItem("Цифровые товары","digital_goods");
-    categoryBox->addItem("Красота","beauty");
-    categoryBox->addItem("Транспорт","transport");
-    categoryBox->addItem("Остальное","rest");
+    // categoryBox = new QComboBox(this);
+    // categoryBox->addItem("Еда","food");
+    // categoryBox->addItem("Переводы","translation");
+    // categoryBox->addItem("Супермаркеты","shops");
+    // categoryBox->addItem("Цифровые товары","digital_goods");
+    // categoryBox->addItem("Красота","beauty");
+    // categoryBox->addItem("Транспорт","transport");
+    // categoryBox->addItem("Остальное","rest");
+    // categoryBox->setEditable(true);
 
 
 
@@ -84,7 +126,7 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     formLayout->addWidget(enterDate, 0, 2);
     formLayout->addWidget(enterSumm, 1, 2);
     formLayout->addWidget(etnerText, 2, 2);
-    formLayout->addWidget(categoryBox,3,2);
+
 
     topLayout->addLayout(formLayout);
 
@@ -148,6 +190,10 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     connect(list, &QListWidget::itemDoubleClicked, this, &secondwindow::on_list_itemDoubleClicked);
     connect(searchButton,&QPushButton::clicked,this, &secondwindow::on_search_cliked);
 
+    connect(mainPage_button,&QPushButton::clicked,this,[this](){stackedWidget->setCurrentWidget(mainPage);});
+    connect(limitPage_button,&QPushButton::clicked,this,[this](){stackedWidget->setCurrentWidget(limitPage);});
+
+
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName("./MyWalletDB.db");
     if (!db.open()) {
@@ -157,8 +203,165 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     QSqlQuery query;
     query.exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT, password TEXT);");
     query.exec("CREATE TABLE IF NOT EXISTS spending(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, summ DOUBLE, type BOOLEAN, date TEXT, comment TEXT, category TEXT);");
+    query.exec("CREATE TABLE IF NOT EXISTS categories("
+               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+               "user_id INTEGER, "
+               "name TEXT, "
+               "code TEXT, "
+               "UNIQUE(user_id, code));");
 
+
+    QSqlQuery seed;
+    seed.prepare("SELECT COUNT(*) FROM categories WHERE user_id = ?");
+    seed.addBindValue(m_userId);
+    seed.exec();
+    seed.next();
+    if (seed.value(0).toInt() == 0) {
+        QSqlQuery ins;
+        ins.prepare("INSERT OR IGNORE INTO categories(user_id, name, code) VALUES(?, ?, ?)");
+        const QList<QPair<QString,QString>> defaults = {
+                                                         {"Еда",             "food"},
+                                                         {"Переводы",        "translation"},
+                                                         {"Супермаркеты",    "shops"},
+                                                         {"Цифровые товары", "digital_goods"},
+                                                         {"Красота",         "beauty"},
+                                                         {"Транспорт",       "transport"},
+                                                         {"Остальное",       "rest"},
+                                                         };
+        for (const auto &p : defaults) {
+            ins.addBindValue(m_userId);
+            ins.addBindValue(p.first);
+            ins.addBindValue(p.second);
+            ins.exec();
+        }
+    }
+    categoryBox = new QComboBox(this);
+    categoryBox->setEditable(true);
+
+    QSqlQuery catQuery;
+    catQuery.prepare("SELECT name, code FROM categories WHERE user_id = ? ORDER BY id");
+    catQuery.addBindValue(m_userId);
+    catQuery.exec();
+    while (catQuery.next()) {
+        QString name = catQuery.value(0).toString();
+        QString code = catQuery.value(1).toString();
+        categoryBox->addItem(name, code);
+    }
+    formLayout->addWidget(categoryBox,3,2);
     on_reload_clicked();
+
+
+
+    //лимиты
+
+    limitPage = new QWidget(this);
+
+
+
+    // QGridLayout *balanceLayout = new QGridLayout();
+    // balance = new QLabel("0");
+    // balance->setStyleSheet("color: #2e7d5e; font-size: 30px; font-weight: 800;");
+    // QLabel *balance_label = new QLabel("Баланс:");
+    // balance_label->setStyleSheet("color: #2e7d5e; font-size: 30px; font-weight: 800;");
+    // balanceLayout->addWidget(balance_label, 0, 0);
+    // balanceLayout->addWidget(balance, 0, 1);
+
+    // doxod = new QLabel("0");
+    // doxod->setStyleSheet("color: #2e7d5e; font-size: 18px; font-weight: 700;");
+    // QLabel *doxod_label = new QLabel("Доходы:");
+    // doxod_label->setStyleSheet("color: #2e7d5e; font-size: 17px; font-weight: 700;");
+    // rasxod = new QLabel("0");
+    // rasxod->setStyleSheet("color: #d14545; font-size: 18px; font-weight: 700;");
+    // QLabel *rasxod_label = new QLabel("Расходы:");
+    // rasxod_label->setStyleSheet("color: #2e7d5e; font-size: 17px; font-weight: 700;");
+
+    // balanceLayout->addWidget(doxod_label, 1, 0);
+    // balanceLayout->addWidget(doxod, 1, 1);
+    // balanceLayout->addWidget(rasxod_label, 2, 0);
+    // balanceLayout->addWidget(rasxod, 2, 1);
+    // topLayout->addLayout(balanceLayout);
+
+
+    // Вертикальный layout на всю страницу
+    QVBoxLayout *limitsLayout = new QVBoxLayout(limitPage);
+
+    // Заголовок
+    QLabel *limitsTitle = new QLabel("Лимиты по категориям", limitPage);
+    limitsTitle->setStyleSheet("color: #2e7d5e; font-size: 22px; font-weight: 800;");
+    limitsLayout->addWidget(limitsTitle);
+
+    // Горизонтальная строка формы
+    QHBoxLayout *formLayout2 = new QHBoxLayout();
+
+    QLabel *categoryLabel2 = new QLabel("Категория:", limitPage);
+    categoryBoxLimit = new QComboBox(limitPage);
+    categoryBoxLimit->setEditable(true);
+    categoryBoxLimit->setMinimumWidth(160);
+    QSqlQuery catQuery2;
+    catQuery2.prepare("SELECT name, code FROM categories WHERE user_id = ? ORDER BY id");
+    catQuery2.addBindValue(m_userId);
+    catQuery2.exec();
+    while (catQuery2.next())
+        categoryBoxLimit->addItem(catQuery2.value(0).toString(), catQuery2.value(1).toString());
+
+    QLabel *summLabel2 = new QLabel("Лимит:", limitPage);
+    enterSummLimit = new QLineEdit(limitPage);
+    enterSummLimit->setPlaceholderText("Сумма в месяц");
+    enterSummLimit->setMinimumWidth(140);
+    QDoubleValidator *summValidator2 = new QDoubleValidator(0, 999999999, 2, this);
+    summValidator2->setNotation(QDoubleValidator::StandardNotation);
+    summValidator2->setLocale(QLocale::c());
+    enterSummLimit->setValidator(summValidator2);
+
+    saveLimitBtn = new QPushButton("Сохранить", limitPage);
+    saveLimitBtn->setStyleSheet(
+        "QPushButton { background-color: #2e7d5e; color: white; font-weight: bold; "
+        "padding: 8px 18px; border-radius: 8px; } "
+        "QPushButton:hover { background-color: #256b4f; }");
+
+    formLayout2->addWidget(categoryLabel2);
+    formLayout2->addWidget(categoryBoxLimit);
+    formLayout2->addWidget(summLabel2);
+    formLayout2->addWidget(enterSummLimit);
+    formLayout2->addWidget(saveLimitBtn);
+    formLayout2->addStretch();
+
+    limitsLayout->addLayout(formLayout2);
+
+
+    limitsList = new QListWidget(limitPage);
+    limitsList->setFont(QFont("Arial", 13));
+    limitsList->setStyleSheet("background-color: white; border: 2px solid #2e7d5e; padding: 10px;");
+    limitsLayout->addWidget(limitsList);
+
+
+    limitsStatus = new QLabel(limitPage);
+    limitsStatus->setVisible(false);
+    limitsStatus->setAlignment(Qt::AlignCenter);
+    limitsStatus->setStyleSheet("color: #d14545; font-size: 14px; font-weight: 500;");
+    limitsLayout->addWidget(limitsStatus);
+
+    connect(saveLimitBtn, &QPushButton::clicked, this, &secondwindow::on_save_limit_clicked);
+
+
+
+
+    //
+    stackedWidget->addWidget(mainPage);
+    stackedWidget->addWidget(limitPage);
+    rootLayout->addWidget(sidebar);
+    rootLayout->addWidget(stackedWidget,1);
+
+
+
+}
+
+//лимиты функции
+void secondwindow::on_save_limit_clicked(){
+
+}
+void secondwindow::on_reload_limits_clicked(){
+
 }
 QString secondwindow::returnCategory(QString category){
     for(int i=0;i<categoryBox->count();i++){
@@ -177,15 +380,47 @@ secondwindow::~secondwindow()
 void secondwindow::on_pushButton_clicked()
 {
     QSqlQuery query;
-    int summ = enterSumm->text().toInt();
+    double summ = enterSumm->text().toDouble();
     QString coment = etnerText->text();
-    QString date = enterDate->text();
-    QString category= categoryBox->currentData().toString();
-    if (summ == 0 || coment.isEmpty() || date.isEmpty()) {
+    QString date = enterDate->date().toString("yyyy-MM-dd");
+    QString category = categoryBox->currentData().toString();
+    if (category.isEmpty()) {
+        category = categoryBox->currentText().trimmed();
+    }
+
+
+    if (summ == 0 || coment.isEmpty() ) {
         status->setText("Заполните все поля");
         status->setVisible(true);
         return;
     }
+
+    QString categoryCode = categoryBox->currentData().toString();
+    QString categoryName = categoryBox->currentText().trimmed();
+
+    if (categoryCode.isEmpty()) {
+
+        QSqlQuery findCat;
+        findCat.prepare("SELECT code FROM categories WHERE user_id = ? AND name = ?");
+        findCat.addBindValue(m_userId);
+        findCat.addBindValue(categoryName);
+        if (findCat.exec() && findCat.next()) {
+
+            categoryCode = findCat.value(0).toString();
+        } else {
+
+            categoryCode = categoryName;
+            QSqlQuery insertCat;
+            insertCat.prepare("INSERT INTO categories(user_id, name, code) VALUES(?, ?, ?)");
+            insertCat.addBindValue(m_userId);
+            insertCat.addBindValue(categoryName);
+            insertCat.addBindValue(categoryCode);
+            if (!insertCat.exec()) {
+                qDebug() << "Ошибка добавления категории:" << insertCat.lastError().text();
+            }
+        }
+    }
+
 
     if (summ > 0) {
         query.prepare("INSERT INTO spending (user_id, summ, type, date, comment, category) VALUES (?, ?, 1, ?, ?, ?)");
@@ -197,19 +432,30 @@ void secondwindow::on_pushButton_clicked()
     query.addBindValue(summ);
     query.addBindValue(date);
     query.addBindValue(coment);
-    query.addBindValue(category);
+    query.addBindValue(categoryCode);
     if (query.exec()) {
 
         status->setText("Операция добавлена");
         status->setVisible(true);
         enterSumm->clear();
         etnerText->clear();
-        enterDate->clear();
+        enterDate->setDate(QDate::currentDate());
         on_reload_clicked();
+
+        categoryBox->clear();
+        QSqlQuery reloadCats;
+        reloadCats.prepare("SELECT name, code FROM categories WHERE user_id = ? ORDER BY id");
+        reloadCats.addBindValue(m_userId);
+        reloadCats.exec();
+        while (reloadCats.next()) {
+            categoryBox->addItem(reloadCats.value(0).toString(), reloadCats.value(1).toString());
+        }
+
+        int idx = categoryBox->findData(categoryCode);
+        if (idx != -1) categoryBox->setCurrentIndex(idx);
     } else {
         status->setText("Ошибка: " + query.lastError().text());
         status->setVisible(true);
-
 
     }
 }
@@ -254,6 +500,7 @@ void secondwindow::on_reload_clicked()
 
 }
 void secondwindow::on_search_cliked(){
+    status->setVisible(false);
     QString comment= enterSearch->text();
     if(comment.isEmpty()){
         status->setText("Введите данные для поиска");
@@ -262,37 +509,46 @@ void secondwindow::on_search_cliked(){
     }
     list->clear();
     QSqlQuery query;
-    query.prepare("SELECT id, date, summ, comment, type, category FROM spending WHERE user_id = ? AND comment=? ORDER BY date DESC");
+    query.prepare("SELECT id, date, summ, comment, type, category FROM spending WHERE user_id = ? AND (comment=? OR summ=?) ORDER BY date DESC");
     query.addBindValue(m_userId);
     query.addBindValue(comment);
+    query.addBindValue(comment.toDouble());
     query.exec();
     double endSumm = 0, doxodSum = 0, rasxodSum = 0;
+    bool found=false;
+        while (query.next()) {
+            int id = query.value(0).toInt();
+            found = true;
+            QString date = query.value(1).toString();
+            double summ = query.value(2).toDouble();
+            QString comment = query.value(3).toString();
+            int type = query.value(4).toInt();
 
-    while (query.next()) {
-        int id = query.value(0).toInt();
-        QString date = query.value(1).toString();
-        double summ = query.value(2).toDouble();
-        QString comment = query.value(3).toString();
-        int type = query.value(4).toInt();
+            QString category= returnCategory(query.value(5).toString());
 
-        QString category= returnCategory(query.value(5).toString());
+            endSumm += summ;
 
-        endSumm += summ;
+            QListWidgetItem *item = new QListWidgetItem();
+            item->setData(Qt::UserRole, id);
+            item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
 
-        QListWidgetItem *item = new QListWidgetItem();
-        item->setData(Qt::UserRole, id);
-        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
+            if (type == 1) {
+                item->setForeground(QColor(46, 125, 94));
+                doxodSum += summ;
+            } else {
+                item->setForeground(QColor(209, 69, 69));
+                rasxodSum += summ;
+            }
 
-        if (type == 1) {
-            item->setForeground(QColor(46, 125, 94));
-            doxodSum += summ;
-        } else {
-            item->setForeground(QColor(209, 69, 69));
-            rasxodSum += summ;
+            list->addItem(item);
         }
 
-        list->addItem(item);
-    }
+        if(found!=true){
+            status->setText("Траты не найдены");
+            status->setVisible(true);
+        }
+
+
 
     balance->setText(QString::number(endSumm));
     rasxod->setText(QString::number(rasxodSum));
@@ -302,6 +558,11 @@ void secondwindow::on_search_cliked(){
 }
 void secondwindow::on_reload_2_clicked()
 {
+    QMessageBox::StandardButton reply = QMessageBox::question(this,"Подтверждение удаления","Удалить выбраную запись?",QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
+    if(reply!=QMessageBox::Yes){
+        return;
+    }
+
     QListWidgetItem *currentItem = list->currentItem();
     if (!currentItem) {
 

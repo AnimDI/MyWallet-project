@@ -12,6 +12,7 @@
 #include <QColor>
 #include <QDate>
 #include <QDebug>
+#include <QProgressBar>
 //#include <QStackedWidget>
 secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     : QMainWindow(parent), m_userId(userId), m_userLogin(userLogin)
@@ -191,7 +192,7 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     connect(searchButton,&QPushButton::clicked,this, &secondwindow::on_search_cliked);
 
     connect(mainPage_button,&QPushButton::clicked,this,[this](){stackedWidget->setCurrentWidget(mainPage);});
-    connect(limitPage_button,&QPushButton::clicked,this,[this](){stackedWidget->setCurrentWidget(limitPage);});
+    connect(limitPage_button,&QPushButton::clicked,this,[this](){stackedWidget->setCurrentWidget(limitPage); on_reload_limits_clicked();});
 
 
     db = QSqlDatabase::addDatabase("QSQLITE");
@@ -209,6 +210,8 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
                "name TEXT, "
                "code TEXT, "
                "UNIQUE(user_id, code));");
+
+    query.exec("CREATE TABLE IF NOT EXISTS limits(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,summ DOUBLE, category TEXT, UNIQUE(user_id,category))");
 
 
     QSqlQuery seed;
@@ -282,15 +285,14 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
     // topLayout->addLayout(balanceLayout);
 
 
-    // Вертикальный layout на всю страницу
+
     QVBoxLayout *limitsLayout = new QVBoxLayout(limitPage);
 
-    // Заголовок
+
     QLabel *limitsTitle = new QLabel("Лимиты по категориям", limitPage);
     limitsTitle->setStyleSheet("color: #2e7d5e; font-size: 22px; font-weight: 800;");
     limitsLayout->addWidget(limitsTitle);
 
-    // Горизонтальная строка формы
     QHBoxLayout *formLayout2 = new QHBoxLayout();
 
     QLabel *categoryLabel2 = new QLabel("Категория:", limitPage);
@@ -345,24 +347,136 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget *parent)
 
 
 
-
     //
     stackedWidget->addWidget(mainPage);
     stackedWidget->addWidget(limitPage);
     rootLayout->addWidget(sidebar);
     rootLayout->addWidget(stackedWidget,1);
 
-
+    on_reload_limits_clicked();
 
 }
 
 //лимиты функции
 void secondwindow::on_save_limit_clicked(){
+    QSqlQuery query;
+    double summ = enterSummLimit->text().toDouble();
+    QString category = categoryBoxLimit->currentData().toString();
 
+
+
+    if (summ == 0 ) {
+        limitsStatus->setText("Заполните все поля");
+        limitsStatus->setVisible(true);
+        return;
+    }
+    query.prepare("INSERT INTO limits(user_id,summ,category) VALUES(?,?,?) ON CONFLICT(user_id, category) DO UPDATE SET summ = excluded.summ");
+    query.addBindValue(m_userId);
+    query.addBindValue(summ);
+    query.addBindValue(category);
+    if(query.exec()){
+        limitsStatus->setText("Лимит добавлен");
+        limitsStatus->setVisible(true);
+    }
+    else{
+        limitsStatus->setText("Ошибка:"+query.lastError().text());
+        limitsStatus->setVisible(true);
+    }
+    enterSummLimit->clear();
+    on_reload_limits_clicked();
 }
+
+
+
+
+
 void secondwindow::on_reload_limits_clicked(){
+    limitsList->clear();
+    QSqlQuery query;
+    query.prepare("SELECT id, summ,category FROM limits WHERE user_id=?");;
+    query.addBindValue(m_userId);
+    query.exec();
+
+
+    while (query.next()) {
+
+
+        int id = query.value(0).toInt();
+        double summ = query.value(1).toDouble();
+        QString code= query.value(2).toString();
+        QString categoryName = returnCategory(code);
+        QProgressBar *progresBar= new QProgressBar();
+        QSqlQuery query2;
+        query2.prepare("SELECT COALESCE(SUM(ABS(summ)), 0) FROM spending "
+                       "WHERE user_id = ? AND category = ? AND date LIKE ? AND type = 0");
+        query2.addBindValue(m_userId);
+        query2.addBindValue(code);
+        query2.addBindValue(QDate::currentDate().toString("yyyy-MM") + "-%");
+        query2.exec();
+        double allSumm = 0;
+        if(query2.next())
+            allSumm = query2.value(0).toDouble();
+
+
+        int procent = (summ > 0) ? qRound(allSumm / summ * 100.0) : 0;
+        progresBar->setRange(0, 100);
+        progresBar->setValue(qMin(procent, 100));
+        progresBar->setTextVisible(true);
+
+        QString color;
+        if (procent >= 100) {
+            color = "#d14545";
+        } else if (procent >= 80) {
+            color = "#e6a700";
+        } else {
+            color = "#2e7d5e";
+        }
+
+        progresBar->setStyleSheet(QString(
+                                      "QProgressBar {"
+                                      "    border: 1px solid #ccc;"
+                                      "    border-radius: 6px;"
+                                      "    background: #f0f0f0;"
+                                      "    text-align: center;"
+                                      "    color: %1;"
+                                      "    font-weight: bold;"
+                                      "}"
+                                      "QProgressBar::chunk {"
+                                      "    background-color: %1;"
+                                      "    border-radius: 6px;"
+                                      "}"
+                                      ).arg(color));
+        QListWidgetItem *item = new QListWidgetItem(limitsList);
+
+
+        QString text = QString("%1: %2 / %3  (%4%)")
+                           .arg(categoryName)
+                           .arg(allSumm, 0, 'f', 2)
+                           .arg(summ, 0, 'f', 2)
+                           .arg(procent);
+
+
+
+
+        QLabel *label = new QLabel(text);
+        item->setData(Qt::UserRole, id);
+        // item->setText("Сумма: " + QString::number(summ) + " Категория: " + categoryName);
+        // limitsList->addItem(item);
+        QWidget *row = new QWidget(limitsList);
+        QVBoxLayout *rowLayout = new QVBoxLayout(row);
+        rowLayout->addWidget(label);
+        rowLayout->addWidget(progresBar);
+
+        item->setData(Qt::UserRole, id);
+        item->setSizeHint(row->sizeHint());
+        limitsList->addItem(item);
+        limitsList->setItemWidget(item, row);
+    }
 
 }
+
+
+
 QString secondwindow::returnCategory(QString category){
     for(int i=0;i<categoryBox->count();i++){
         if(category== categoryBox->itemData(i).toString()){
@@ -383,6 +497,8 @@ void secondwindow::on_pushButton_clicked()
     double summ = enterSumm->text().toDouble();
     QString coment = etnerText->text();
     QString date = enterDate->date().toString("yyyy-MM-dd");
+
+
     QString category = categoryBox->currentData().toString();
     if (category.isEmpty()) {
         category = categoryBox->currentText().trimmed();
@@ -422,11 +538,44 @@ void secondwindow::on_pushButton_clicked()
     }
 
 
+    qDebug() << "CategoryCode:" << categoryCode;
+
+    QSqlQuery limitQuery;
+    limitQuery.prepare("SELECT summ FROM limits WHERE user_id = ? AND category = ?");
+    limitQuery.addBindValue(m_userId);
+    limitQuery.addBindValue(categoryCode);
+
+    double Summ = 0;
+    if (limitQuery.exec() && limitQuery.next()) {
+        Summ = limitQuery.value(0).toDouble();
+    } else {
+        qDebug() << "Ошибка или запись не найдена:" << limitQuery.lastError().text();
+    }
+
+
+
+    QSqlQuery query3;
+    query3.prepare("SELECT COALESCE(SUM(ABS(summ)), 0) FROM spending "
+                   "WHERE user_id = ? AND category = ? AND date LIKE ? AND type = 0");
+    query3.addBindValue(m_userId);
+    query3.addBindValue(categoryCode);
+    query3.addBindValue(QDate::currentDate().toString("yyyy-MM") + "-%");
+    query3.exec();
+
+    double allSumm = 0;
+    if (query3.next())
+        allSumm = query3.value(0).toDouble();
+
+
+    if (Summ > 0 && (allSumm + qAbs(summ)) > Summ) {
+        QMessageBox::warning(this, "Лимит", "Лимит превышен");
+    }
     if (summ > 0) {
         query.prepare("INSERT INTO spending (user_id, summ, type, date, comment, category) VALUES (?, ?, 1, ?, ?, ?)");
     } else {
         query.prepare("INSERT INTO spending (user_id, summ, type, date, comment, category) VALUES (?, ?, 0, ?, ?, ?)");
     }
+
 
     query.addBindValue(m_userId);
     query.addBindValue(summ);
@@ -516,37 +665,37 @@ void secondwindow::on_search_cliked(){
     query.exec();
     double endSumm = 0, doxodSum = 0, rasxodSum = 0;
     bool found=false;
-        while (query.next()) {
-            int id = query.value(0).toInt();
-            found = true;
-            QString date = query.value(1).toString();
-            double summ = query.value(2).toDouble();
-            QString comment = query.value(3).toString();
-            int type = query.value(4).toInt();
+    while (query.next()) {
+        int id = query.value(0).toInt();
+        found = true;
+        QString date = query.value(1).toString();
+        double summ = query.value(2).toDouble();
+        QString comment = query.value(3).toString();
+        int type = query.value(4).toInt();
 
-            QString category= returnCategory(query.value(5).toString());
+        QString category= returnCategory(query.value(5).toString());
 
-            endSumm += summ;
+        endSumm += summ;
 
-            QListWidgetItem *item = new QListWidgetItem();
-            item->setData(Qt::UserRole, id);
-            item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
+        QListWidgetItem *item = new QListWidgetItem();
+        item->setData(Qt::UserRole, id);
+        item->setText("Дата: " + date + " Сумма: " + QString::number(summ) + " Комментарий: " + comment + " Категория: " + category);
 
-            if (type == 1) {
-                item->setForeground(QColor(46, 125, 94));
-                doxodSum += summ;
-            } else {
-                item->setForeground(QColor(209, 69, 69));
-                rasxodSum += summ;
-            }
-
-            list->addItem(item);
+        if (type == 1) {
+            item->setForeground(QColor(46, 125, 94));
+            doxodSum += summ;
+        } else {
+            item->setForeground(QColor(209, 69, 69));
+            rasxodSum += summ;
         }
 
-        if(found!=true){
-            status->setText("Траты не найдены");
-            status->setVisible(true);
-        }
+        list->addItem(item);
+    }
+
+    if(found!=true){
+        status->setText("Траты не найдены");
+        status->setVisible(true);
+    }
 
 
 

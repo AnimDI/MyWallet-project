@@ -197,13 +197,13 @@ secondwindow::secondwindow(int userId, QString userLogin, QWidget* parent)
         QSqlQuery ins;
         ins.prepare("INSERT OR IGNORE INTO categories(user_id, name, code) VALUES(?, ?, ?)");
         const QList<QPair<QString, QString>> defaults = {
-            {"Еда", "food"},
-            {"Переводы", "translation"},
-            {"Супермаркеты", "shops"},
-            {"Цифровые товары", "digital_goods"},
-            {"Красота", "beauty"},
-            {"Транспорт", "transport"},
-            {"Остальное", "rest"},
+                                                         { "Еда", "food" },
+                                                         { "Переводы", "translation" },
+                                                         { "Супермаркеты", "shops" },
+                                                         { "Цифровые товары", "digital_goods" },
+                                                         { "Красота", "beauty" },
+                                                         { "Транспорт", "transport" },
+                                                         { "Остальное", "rest" },
         };
         for (const auto& p : defaults) {
             ins.addBindValue(m_userId);
@@ -614,6 +614,13 @@ void secondwindow::on_reload_clicked()
     query.addBindValue(m_userId);
     query.exec();
 
+    QSqlQuery query2;
+    query2.prepare("SELECT id, date, summ, comment, type, category FROM spending WHERE user_id = ? AND date LIKE ?");
+
+    query2.addBindValue(m_userId);
+    query2.addBindValue(QDate::currentDate().toString("yyyy-MM") + "-%");
+    query2.exec();
+
     double endSumm = 0, doxodSum = 0, rasxodSum = 0;
 
     while (query.next()) {
@@ -623,7 +630,7 @@ void secondwindow::on_reload_clicked()
         QString comment = query.value(3).toString();
         int type = query.value(4).toInt();
         QString category = returnCategory(query.value(5).toString());
-        endSumm += summ;
+
 
         QListWidgetItem* item = new QListWidgetItem();
         item->setData(Qt::UserRole, id);
@@ -631,20 +638,33 @@ void secondwindow::on_reload_clicked()
 
         if (type == 1) {
             item->setForeground(QColor(46, 125, 94));
-            doxodSum += summ;
+
         }
         else {
             item->setForeground(QColor(209, 69, 69));
-            rasxodSum += summ;
+
         }
 
         list->addItem(item);
+    }
+    while (query2.next()) {
+        double summ = query2.value(2).toDouble();
+        int type = query2.value(4).toInt();
+
+        endSumm += summ;
+        if (type == 1) {
+            doxodSum += summ;
+        }
+        else {
+            rasxodSum += summ;
+        }
     }
 
     balance->setText(QString::number(endSumm));
     rasxod->setText(QString::number(rasxodSum));
     doxod->setText(QString::number(doxodSum));
 }
+
 
 void secondwindow::on_search_cliked()
 {
